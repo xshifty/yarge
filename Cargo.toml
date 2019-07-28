@@ -1,0 +1,12 @@
+[package]
+name = "yarge"
+version = "0.1.0"
+authors = ["xshifty"]
+edition = "2018"
+
+[dependencies]
+yarge_core = { path = "./src/core", version = "0.1.0", optional = false }
+
+[[example]]
+name = "hello_world"
+path = "examples/hello_world/main.rs"

@@ -1,0 +1,9 @@
+[package]
+name = "yarge_core"
+version = "0.1.0"
+authors = ["xshifty"]
+edition = "2018"
+
+[dependencies.sdl2]
+version = "0.32.2"
+default-features = false
