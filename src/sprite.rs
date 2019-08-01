@@ -3,9 +3,9 @@ pub(crate) type Path = &'static str;
 #[derive(Clone)]
 pub struct Sprite {
     path: Path,
+    frames: [u32; 2],
     position: [i32; 2],
-    dimension: [u32; 2],
-    frame_dimension: [u32; 2],
+    frame_size: [u32; 2],
 }
 
 impl Sprite {
@@ -13,28 +13,28 @@ impl Sprite {
         self.path
     }
 
+    pub fn get_frames(&self) -> [u32; 2] {
+        self.frames
+    }
+
     pub fn get_position(&self) -> [i32; 2] {
         self.position
     }
 
-    pub fn get_dimension(&self) -> [u32; 2] {
-        self.dimension
-    }
-
-    pub fn get_frame_dimension(&self) -> [u32; 2] {
-        self.frame_dimension
+    pub fn get_frame_size(&self) -> [u32; 2] {
+        self.frame_size
     }
 }
 
 pub struct SpriteBuilder{}
 
 impl SpriteBuilder {
-    pub fn build(path: Path, position: [i32; 2], dimension: [u32; 2], frame_dimension: [u32; 2]) -> Sprite {
+    pub fn build(path: Path, frames: [u32; 2], position: [i32; 2], frame_size: [u32; 2]) -> Sprite {
         Sprite{
             path: path,
+            frames: frames,
             position: position,
-            dimension: dimension,
-            frame_dimension: frame_dimension,
+            frame_size: frame_size,
         }
     }
 }

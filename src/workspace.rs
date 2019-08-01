@@ -3,6 +3,7 @@ extern crate sdl2;
 use std::collections::HashMap;
 use std::fmt;
 use sdl2::{
+    rect::Rect,
     event::Event,
     keyboard::Keycode,
     render::{Canvas, TextureCreator},
@@ -46,15 +47,15 @@ impl fmt::Debug for Workspace {
 }
 
 impl Workspace {
-    pub fn get_title(&mut self) -> &'static str {
+    pub fn get_title(&self) -> &'static str {
         self.title
     }
 
-    pub fn get_dimension(&mut self) -> [u32; 2] {
+    pub fn get_dimension(&self) -> [u32; 2] {
         self.dimension
     }
 
-    pub fn get_current_stage_name(&mut self) -> &'static str {
+    pub fn get_current_stage_name(&self) -> &'static str {
         self.current_stage
     }
 
@@ -137,10 +138,16 @@ impl Workspace {
 
             stage_callback(self, events);
 
-            for (path, _) in self.sprites.iter() {
+            for (path, sprite) in self.sprites.iter() {
                 let texture = self.texture_creator.load_texture(path).unwrap();
+                let frame_size = sprite.get_frame_size();
+                let position = sprite.get_position();
 
-                match self.canvas.copy(&texture, None,None) {
+                match self.canvas.copy(
+                    &texture,
+                    Rect::new(0, 0, frame_size[0], frame_size[1]),
+                    Rect::new(position[0], position[1], frame_size[0], frame_size[1])
+                ) {
                     Err(_) => { panic!("Unable to draw texture {} to canvas", path) }
                     _ => {}
                 }
