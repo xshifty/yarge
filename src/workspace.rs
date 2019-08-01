@@ -5,8 +5,9 @@ use std::fmt;
 use sdl2::{
     event::Event,
     keyboard::Keycode,
-    render::Canvas,
-    video::{FullscreenType, Window},
+    render::{Canvas, TextureCreator},
+    image::{LoadTexture, InitFlag},
+    video::{FullscreenType, Window, WindowContext},
     EventPump,
     pixels::Color,
 };
@@ -28,39 +29,40 @@ const DEFAULT_STAGE_NAME: &str = "default";
 pub type EventList = Vec<Event>;
 
 pub struct Workspace {
-    pub(crate) title: crate::Title,
-    pub(crate) width: crate::Width,
-    pub(crate) height: crate::Height,
+    pub(crate) title: &'static str,
+    pub(crate) dimension: [u32; 2],
     pub(crate) current_stage: &'static str,
-    pub(crate) stages: HashMap<String, crate::Stage>,
+    pub(crate) stages: HashMap<String, crate::stage::Stage>,
     pub(crate) event_pump: EventPump,
     pub(crate) canvas: Canvas<Window>,
+    pub(crate) texture_creator: TextureCreator<WindowContext>,
+    pub(crate) sprites: HashMap<crate::sprite::Path, crate::sprite::Sprite>,
 }
 
 impl fmt::Debug for Workspace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-       write!(f, "{{ current_stage: {}, title: {}, width: {}, height: {} }}", self.current_stage, self.title, self.width, self.height)
+       write!(f, "{{ current_stage: {}, title: {}, width: {}, height: {} }}", self.current_stage, self.title, self.dimension[0], self.dimension[1])
     }
 }
 
 impl Workspace {
-    pub fn get_title(&mut self) -> crate::Title {
+    pub fn get_title(&mut self) -> &'static str {
         self.title
     }
 
-    pub fn get_width(&mut self) -> crate::Width {
-        self.width
+    pub fn get_dimension(&mut self) -> [u32; 2] {
+        self.dimension
     }
 
-    pub fn get_height(&mut self) -> crate::Height {
-        self.height
-    }
-
-    pub fn get_current_stage_name(&mut self) -> crate::StageName {
+    pub fn get_current_stage_name(&mut self) -> &'static str {
         self.current_stage
     }
 
-    pub fn switch_stage(&mut self, stage_name: crate::StageName) -> &mut Self {
+    pub fn get_texture_creator(&mut self) -> &mut TextureCreator<WindowContext> {
+        &mut self.texture_creator
+    }
+
+    pub fn switch_stage(&mut self, stage_name: &'static str) -> &mut Self {
         if !self.stages.contains_key(stage_name) {
             panic!("There is no stage named {}", stage_name);
         }
@@ -70,11 +72,19 @@ impl Workspace {
         self
     }
 
-    pub fn add_stage(&mut self, stage: crate::Stage) -> &mut Self {
+    pub fn add_stage(&mut self, stage: crate::stage::Stage) -> &mut Self {
         let stage_name = stage.clone().get_name();
 
         self.stages
             .insert(String::from(stage_name).to_string(), stage);
+
+        self
+    }
+
+    pub fn add_sprite(&mut self, sprite: crate::sprite::Sprite) -> &mut Self {
+        let sprite_path = sprite.clone().get_path();
+
+        self.sprites.insert(sprite_path, sprite);
 
         self
     }
@@ -89,6 +99,7 @@ impl Workspace {
         'game_loop: loop {
             self.canvas.set_draw_color(rgba!(0x306090ff));
             self.canvas.clear();
+            self.sprites.clear();
             events.clear();
 
             for event in self.event_pump.poll_iter() {
@@ -124,7 +135,16 @@ impl Workspace {
             let mut current_stage = self.stages.get(self.current_stage).unwrap().clone();
             let stage_callback = current_stage.get_callback();
 
-            stage_callback(self);
+            stage_callback(self, events);
+
+            for (path, _) in self.sprites.iter() {
+                let texture = self.texture_creator.load_texture(path).unwrap();
+
+                match self.canvas.copy(&texture, None,None) {
+                    Err(_) => { panic!("Unable to draw texture {} to canvas", path) }
+                    _ => {}
+                }
+            }
 
             self.canvas.present();
 
@@ -137,24 +157,27 @@ pub struct WorkspaceBuilder {}
 
 impl WorkspaceBuilder {
     pub fn build(
-        title: crate::Title,
-        width: crate::Width,
-        height: crate::Height,
+        title: &'static str,
+        dimension: [u32; 2],
     ) -> Workspace {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
-        let window = video.window(title, width, height).opengl().build().unwrap();
+        let window = video.window(title, dimension[0], dimension[1]).opengl().build().unwrap();
         let canvas = window.into_canvas().accelerated().build().unwrap();
+        let texture_creator = canvas.texture_creator();
         let event_pump = context.event_pump().unwrap();
 
-        return Workspace {
+        sdl2::image::init(InitFlag::PNG | InitFlag::JPG).unwrap();
+
+        Workspace {
             title: title,
-            width: width,
-            height: height,
+            dimension: dimension,
             current_stage: DEFAULT_STAGE_NAME,
             stages: HashMap::new(),
             event_pump: event_pump,
             canvas: canvas,
-        };
+            texture_creator: texture_creator,
+            sprites: HashMap::new(),
+        }
     }
 }
