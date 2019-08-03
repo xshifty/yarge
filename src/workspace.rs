@@ -6,7 +6,7 @@ use sdl2::{
     rect::Rect,
     event::Event,
     keyboard::Keycode,
-    render::{Canvas, TextureCreator},
+    render::{Canvas, TextureCreator, Texture},
     image::{LoadTexture, InitFlag},
     video::{FullscreenType, Window, WindowContext},
     EventPump,
@@ -37,7 +37,8 @@ pub struct Workspace {
     pub(crate) event_pump: EventPump,
     pub(crate) canvas: Canvas<Window>,
     pub(crate) texture_creator: TextureCreator<WindowContext>,
-    pub(crate) sprites: HashMap<crate::sprite::Path, crate::sprite::Sprite>,
+    pub(crate) sprites: HashMap<String, crate::sprite::Sprite>,
+    pub(crate) cache: HashMap<crate::sprite::Path, Texture>,
 }
 
 impl fmt::Debug for Workspace {
@@ -82,10 +83,47 @@ impl Workspace {
         self
     }
 
-    pub fn add_sprite(&mut self, sprite: crate::sprite::Sprite) -> &mut Self {
-        let sprite_path = sprite.clone().get_path();
+    pub fn add_sprite(&mut self, name: &'static str, sprite: crate::sprite::Sprite) -> &mut Self {
+        self.sprites
+            .insert(String::from(name).to_string(), sprite);
+        
+        self
+    }
 
-        self.sprites.insert(sprite_path, sprite);
+    pub fn draw_sprite(&mut self, sprite_name: &'static str, position: [i32; 2], dimension: [u32; 2]) -> &mut Self {
+        let sprite = self.sprites.get(&String::from(sprite_name).to_string());
+
+        match sprite {
+            Some(_) => {
+                let mut sprite = sprite.unwrap().clone();
+
+                if !self.cache.contains_key(sprite.path) {
+                    println!("Caching {}...", sprite.path);
+                    let texture = self.texture_creator.load_texture(sprite.path);
+                    self.cache.insert(sprite.path, texture.unwrap());
+                }
+
+                let frame_w = sprite.frame_size[0];
+                let frame_h = sprite.frame_size[1];
+                let current_x = (((sprite.current_frame % sprite.frames[0]) * frame_w) as i32) + sprite.position[0];
+                let current_y = frame_h as i32;
+
+                self.canvas.copy(
+                    self.cache.get(sprite.path).unwrap(),
+                    Rect::new(current_x, current_y, frame_w, frame_h),
+                    Rect::new(position[0], position[1], dimension[0], dimension[1])
+                ).unwrap();
+
+                sprite.set_current_frame(sprite.get_current_frame() + 1);
+
+                // println!("{} {} = {:?}", current_x, current_y, sprite);
+
+                self.sprites.insert(String::from(sprite_name).to_string(), sprite);
+            },
+            None => {
+                panic!("Sprite {} not registered.", sprite_name)
+            }
+        }
 
         self
     }
@@ -100,7 +138,6 @@ impl Workspace {
         'game_loop: loop {
             self.canvas.set_draw_color(rgba!(0x306090ff));
             self.canvas.clear();
-            self.sprites.clear();
             events.clear();
 
             for event in self.event_pump.poll_iter() {
@@ -138,24 +175,9 @@ impl Workspace {
 
             stage_callback(self, events);
 
-            for (path, sprite) in self.sprites.iter() {
-                let texture = self.texture_creator.load_texture(path).unwrap();
-                let frame_size = sprite.get_frame_size();
-                let position = sprite.get_position();
-
-                match self.canvas.copy(
-                    &texture,
-                    Rect::new(0, 0, frame_size[0], frame_size[1]),
-                    Rect::new(position[0], position[1], frame_size[0], frame_size[1])
-                ) {
-                    Err(_) => { panic!("Unable to draw texture {} to canvas", path) }
-                    _ => {}
-                }
-            }
-
             self.canvas.present();
 
-            ::std::thread::sleep(std::time::Duration::new(0, 1_000_000_000u32 / 60));
+            ::std::thread::sleep(std::time::Duration::from_millis(1000/12));
         }
     }
 }
@@ -185,6 +207,7 @@ impl WorkspaceBuilder {
             canvas: canvas,
             texture_creator: texture_creator,
             sprites: HashMap::new(),
+            cache: HashMap::new(),
         }
     }
 }
